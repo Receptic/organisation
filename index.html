@@ -1,0 +1,1089 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Haller Organisation</title>
+<script src="https://alcdn.msauth.net/browser/3.10.0/js/msal-browser.min.js"></script>
+<script src="config.js"></script>
+<script src="seed.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: sticky header with tabs; views are work surfaces (board / tree / table / ladder); a right-hand drawer edits one record at a time. */
+:root{
+  --bg:#f6f7f4; --surface:#ffffff; --surface-2:#eef1ea; --line:#d6dccf; --line-strong:#b9c2ad;
+  --fg:#1c231a; --muted:#5f6a58; --faint:#8b9484;
+  --accent:#0a8a3c; --accent-fg:#ffffff; --accent-soft:#dff0e3; --accent-ink:#066a2e;
+  --p1:#2e7d32; --p2:#c0392b; --p3:#b8560f; --p4:#2a6fb0;
+  --warn:#b7791f; --warn-soft:#fbf0d6; --danger:#b3261e; --danger-soft:#f9e0dd;
+  --shadow:0 12px 32px rgba(28,35,26,.14);
+  --display:"Archivo",system-ui,sans-serif; --body:"Source Sans 3",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#151915; --surface:#1d231d; --surface-2:#242c24; --line:#344034; --line-strong:#475447;
+  --fg:#e8ece4; --muted:#a6b09e; --faint:#75806f;
+  --accent:#3fb86a; --accent-fg:#0d1a10; --accent-soft:#1f3a27; --accent-ink:#7fd99c;
+  --p1:#5ec46a; --p2:#ef6b5c; --p3:#e6904a; --p4:#6fa8e0;
+  --warn:#e2a93b; --warn-soft:#3a2f16; --danger:#f28b82; --danger-soft:#3f1f1c;
+  --shadow:0 12px 32px rgba(0,0,0,.5); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#151915; --surface:#1d231d; --surface-2:#242c24; --line:#344034; --line-strong:#475447;
+  --fg:#e8ece4; --muted:#a6b09e; --faint:#75806f;
+  --accent:#3fb86a; --accent-fg:#0d1a10; --accent-soft:#1f3a27; --accent-ink:#7fd99c;
+  --p1:#5ec46a; --p2:#ef6b5c; --p3:#e6904a; --p4:#6fa8e0;
+  --warn:#e2a93b; --warn-soft:#3a2f16; --danger:#f28b82; --danger-soft:#3f1f1c;
+  --shadow:0 12px 32px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.2}
+.eyebrow{font-family:var(--display);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+.top-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.mark{border:2.5px solid var(--accent);border-radius:7px;padding:2px 8px;font-family:var(--display);font-weight:700;color:var(--accent);line-height:1;display:flex;flex-direction:column;align-items:center}
+.mark small{font-size:9px;font-weight:600;letter-spacing:.02em}
+.mark span{font-size:16px;letter-spacing:-.02em}
+.brand h1{font-size:17px;font-weight:600}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.tab{border:1px solid transparent;background:transparent;border-radius:8px;padding:7px 12px;font-family:var(--display);font-weight:600;font-size:13px;color:var(--muted)}
+.tab:hover{background:var(--surface-2)}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+.status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.ok{background:var(--accent)} .dot.ro{background:var(--warn)}
+
+.page{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 60px;max-width:1500px;margin:0 auto}
+.view[hidden]{display:none}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.toolbar .grow{flex:1 1 180px;min-width:0}
+input[type=text],input[type=search],input[type=number],input[type=date],select,textarea{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;min-width:0}
+textarea{min-height:72px;resize:vertical;line-height:1.4}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 13px;font-family:var(--display);font-weight:600;font-size:13px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.empty{border:1px dashed var(--line-strong);border-radius:12px;padding:28px;text-align:center;color:var(--muted);max-width:640px;margin:40px auto}
+.empty h2{font-size:18px;margin-bottom:6px;color:var(--fg)}
+.hint{font-size:13px;color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+
+/* Boards */
+.gf-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:22px}
+.gf-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.gf-card h3{font-size:15px}
+.gf-card ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:5px}
+.gf-card li{font-size:12px;background:var(--surface-2);border-radius:999px;padding:2px 9px}
+.phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;padding-bottom:8px}
+@media (max-width:560px){.phases{grid-template-columns:1fr}}
+.phase{min-width:0}
+.phase-head{display:flex;align-items:baseline;gap:10px;padding:6px 2px 10px;border-bottom:3px solid var(--pc)}
+.phase-head .num{font-family:var(--display);font-weight:700;font-size:22px;color:var(--pc);font-variant-numeric:tabular-nums}
+.phase-head h2{font-size:15px}
+.phase-body{display:flex;flex-direction:column;gap:10px;padding-top:12px}
+.unit{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.unit.over{box-shadow:0 0 0 2px var(--accent)}
+.unit-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.unit-head h3{font-size:14px;flex:1;min-width:0}
+.unit-head .icon{background:none;border:0;color:var(--faint);padding:2px 4px;border-radius:6px;font-size:16px;line-height:1}
+.unit-head .icon:hover{background:var(--surface-2);color:var(--fg)}
+.gf-tag{font-size:11px;font-family:var(--display);font-weight:600;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.count{font-size:11px;font-family:var(--display);font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums}
+.count.under{background:var(--warn-soft);color:var(--warn)} .count.over{background:var(--danger-soft);color:var(--danger)} .count.ok{background:var(--accent-soft);color:var(--accent-ink)}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+@media (max-width:380px){.slots{grid-template-columns:1fr}}
+.slot{border:1px dashed var(--line-strong);border-radius:8px;padding:5px 7px;min-height:38px;min-width:0}
+.slot .lbl{font-family:var(--display);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
+.slot.missing{border-color:var(--warn);background:var(--warn-soft)}
+.slot.missing .lbl::after{content:" · fehlt";color:var(--warn)}
+.slot.over,.members.over{background:var(--accent-soft);border-color:var(--accent)}
+.members{margin-top:8px;border-radius:8px;padding:4px 2px;min-height:30px}
+.members .lbl{font-family:var(--display);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:3px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:3px 10px 3px 8px;font-size:13px;display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;flex-wrap:wrap;text-align:left;cursor:grab}
+.chip:hover{border-color:var(--accent)}
+.chip:active{cursor:grabbing}
+.chip .lead{width:7px;height:7px;border-radius:50%;background:var(--line-strong);flex:none}
+.chip.v{font-weight:600;background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
+.chip.v .lead{background:var(--accent)}
+.chip.s{font-weight:600;border-color:var(--accent)}
+.chip.s .lead{background:var(--surface);border:2px solid var(--accent);width:8px;height:8px}
+.chip .lvl{font-size:11px;color:var(--muted);font-weight:400}
+.chip.unchecked .lvl::after{content:" ?";color:var(--warn);font-weight:700}
+.chip.extern{border-style:dashed}
+.ext{font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);background:var(--warn-soft);border-radius:4px;padding:0 4px;line-height:1.5}
+.chip.highlight{box-shadow:0 0 0 2px var(--accent)}
+.chip.dragging{opacity:.4}
+.add-row{margin-top:10px}
+
+/* Abteilungen tree */
+.tree{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start}
+.tree .unit{--pc:var(--accent)}
+.children{margin-top:10px;display:flex;flex-direction:column;gap:8px;padding-left:10px;border-left:2px solid var(--line)}
+.children .unit{background:var(--bg)}
+
+/* Table */
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:860px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-family:var(--display);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);position:sticky;top:0}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+.badge{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-family:var(--display);font-weight:600;background:var(--surface-2);color:var(--muted)}
+.badge.lvl{background:var(--accent-soft);color:var(--accent-ink)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.flag{font-size:14px}
+.meter{display:inline-block;width:70px;height:6px;background:var(--surface-2);border-radius:3px;vertical-align:middle;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.name-cell{font-weight:600}
+.sub{font-size:12px;color:var(--muted);display:block;font-weight:400}
+
+/* Rollen */
+.lb-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.lb-tab{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 14px;font-family:var(--display);font-weight:600;font-size:13px}
+.lb-tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.stufe{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;min-width:0}
+.stufe:hover{border-color:var(--accent)}
+.stufe .step{font-family:var(--display);font-weight:700;font-size:28px;color:var(--line-strong);line-height:1;font-variant-numeric:tabular-nums}
+.stufe h3{font-size:17px;margin-top:4px}
+.stufe .meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.stufe p{margin:6px 0 0;font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.stufe .who{margin-top:10px;display:flex;flex-wrap:wrap;gap:4px}
+.stufe .who span{font-size:12px;background:var(--surface-2);border-radius:999px;padding:1px 8px}
+.badge.entwurf{background:var(--warn-soft);color:var(--warn)} .badge.abgestimmt{background:var(--accent-soft);color:var(--accent-ink)}
+
+/* Auswertung */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.stat h3{font-size:14px;margin-bottom:10px}
+.bar{display:grid;grid-template-columns:minmax(90px,1fr) 3fr auto;gap:8px;align-items:center;font-size:13px;margin:4px 0}
+.bar .track{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+.bar .track i{display:block;height:100%;background:var(--accent)}
+.bar .n{font-variant-numeric:tabular-nums;color:var(--muted);min-width:2ch;text-align:right}
+.stat ul{margin:0;padding-left:18px;font-size:13px}
+.stat li{margin:3px 0}
+.stat li button{background:none;border:0;padding:0;color:inherit;text-decoration:underline;text-decoration-color:var(--line-strong);cursor:pointer;text-align:left}
+.stat .ok{color:var(--accent-ink);font-size:13px}
+.stat .warnline{color:var(--warn)} .stat .dangerline{color:var(--danger)}
+.roadmap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}
+.roadmap ol{margin:8px 0 0;padding-left:20px;font-size:14px}
+.roadmap li{margin:4px 0}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,100%);background:var(--surface);z-index:21;box-shadow:var(--shadow);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.drawer-head h2{font-size:18px;flex:1;min-width:0}
+.drawer-body{flex:1;overflow-y:auto;padding:16px 18px 24px}
+.drawer-foot{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--line);padding-bottom:max(12px,env(safe-area-inset-bottom,0px));flex-wrap:wrap}
+.drawer-foot .spacer{flex:1}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;min-width:0}
+.field label{font-family:var(--display);font-size:12px;font-weight:600;color:var(--muted)}
+.field .help{font-size:12px;color:var(--faint)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media (max-width:480px){.row2,.row3{grid-template-columns:1fr}}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0}
+.check input{width:16px;height:16px;margin:0}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 14px;min-width:0}
+legend{font-family:var(--display);font-size:12px;font-weight:600;color:var(--muted);padding:0 6px}
+.assign{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;font-size:14px}
+.assign .ph{grid-column:1/-1;font-family:var(--display);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--pc,var(--muted));margin-top:8px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.assign .indent{padding-left:14px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:3px 9px;font-size:12px;font-family:var(--display);font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.seg button[data-v="M"][aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.seg button[data-v="S"][aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+.rating{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;font-size:14px}
+.stars{display:inline-flex;gap:2px}
+.stars button{border:0;background:none;padding:0 1px;font-size:18px;color:var(--line-strong);line-height:1}
+.stars button.on{color:var(--accent)}
+.profile-box{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+.profile-box h4{font-size:13px;margin-bottom:4px;display:inline}
+.profile-box dl{margin:6px 0 0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px}
+.profile-box dt{color:var(--muted);font-weight:600}
+.profile-box dd{margin:0;white-space:pre-wrap}
+.toast{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:30;box-shadow:var(--shadow);max-width:90vw;text-align:center}
+.confirm{margin-top:8px;padding:10px;border:1px solid var(--danger);border-radius:8px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}}
+img{max-width:100%}[hidden]{display:none!important}
+.login{max-width:520px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;text-align:center}
+.login h2{font-size:20px;margin-bottom:8px}.login p{color:var(--muted)}
+.setup{max-width:640px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px}
+.setup h2{font-size:18px;margin-bottom:8px}.setup ol{padding-left:20px;font-size:14px}.setup .log{font-family:ui-monospace,monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:10px;margin-top:10px;white-space:pre-wrap;max-height:220px;overflow:auto}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <div class="brand">
+      <div class="mark"><small>elektro</small><span>a.haller</span></div>
+      <h1>Organisation</h1>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button class="tab" role="tab" data-view="org" aria-selected="true">Nach Wertschöpfung</button>
+      <button class="tab" role="tab" data-view="abt" aria-selected="false">Nach Abteilung</button>
+      <button class="tab" role="tab" data-view="people" aria-selected="false">Mitarbeiter</button>
+      <button class="tab" role="tab" data-view="roles" aria-selected="false">Rollen &amp; Stufen</button>
+      <button class="tab" role="tab" data-view="eval" aria-selected="false">Auswertung</button>
+    </nav>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde …</span><button class="btn sm" id="logoutBtn" hidden>Abmelden</button></div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="login" id="loginBox" hidden><h2>Anmeldung</h2><p>Bitte mit dem Microsoft-365-Konto von Elektro A. Haller anmelden.</p><button class="btn primary" id="loginBtn">Mit Microsoft anmelden</button><p class="hint" id="loginErr"></p></div>
+  <div class="setup" id="setupBox" hidden><h2>Einrichtung</h2><p class="hint">Die SharePoint-Listen für die Organisations-App fehlen noch auf der Site. Mit einem Klick werden sie angelegt und mit den Startdaten (Stand 16.10.2026) gefüllt.</p><button class="btn primary" id="setupBtn">Listen anlegen und Startdaten importieren</button><div class="log" id="setupLog" hidden></div></div>
+  <section class="view" id="view-org">
+    <div class="toolbar">
+      <div>
+        <div class="eyebrow">Verantwortlichkeiten entlang der Wertschöpfung</div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>Verantwortlich</span><span><i style="background:var(--surface);border:2px solid var(--accent)"></i>Stellvertretung</span><span><i style="background:var(--line-strong)"></i>Wirkt mit</span><span>Personen per Drag &amp; Drop verschieben – auf das Feld „Verantwortlich“ oder „Stellvertretung“ ziehen, um die Rolle zu setzen.</span></div>
+      </div>
+      <div class="grow"></div>
+      <select id="orgHighlight" style="width:auto"><option value="">Person hervorheben …</option></select>
+      <label class="check" style="margin:0"><input type="checkbox" id="onlyV"> nur Verantwortliche</label>
+      <button class="btn" id="printOrg" title="Druckdatei (A4 quer) herunterladen">Druckversion</button>
+    </div>
+    <div class="gf-row" id="gfRow"></div>
+    <div class="phases" id="phases"></div>
+  </section>
+
+  <section class="view" id="view-abt" hidden>
+    <div class="toolbar">
+      <div>
+        <div class="eyebrow">Abteilungen und Unterabteilungen</div>
+        <div class="legend"><span>Leitung = Verantwortlich, Stellvertretung, Mitglieder. Soll-Besetzung je Abteilung festlegen, Ist wird gezählt.</span></div>
+      </div>
+      <div class="grow"></div>
+      <select id="abtHighlight" style="width:auto"><option value="">Person hervorheben …</option></select>
+      <button class="btn" id="printAbt" title="Druckdatei (A4 quer) herunterladen">Druckversion</button>
+      <button class="btn primary" id="addAbt">+ Abteilung</button>
+    </div>
+    <div class="tree" id="tree"></div>
+  </section>
+
+  <section class="view" id="view-people" hidden>
+    <div class="toolbar">
+      <input type="search" id="pSearch" class="grow" placeholder="Suchen (Name, Tätigkeit, Notizen) …">
+      <select id="pLaufbahn" style="width:auto"><option value="">Alle Laufbahnen</option></select>
+      <select id="pAbt" style="width:auto"><option value="">Alle Abteilungen</option></select>
+      <label class="check" style="margin:0"><input type="checkbox" id="pUnchecked"> nur ungeprüfte Einstufung</label>
+      <button class="btn primary" id="addPerson">+ Mitarbeiter</button>
+    </div>
+    <div class="table-wrap"><table id="pTable">
+      <thead><tr><th>Name</th><th>Laufbahn / Stufe</th><th>Abteilung</th><th>Bereiche</th><th>Seit</th><th>Merkmale</th><th>Bewertung</th></tr></thead>
+      <tbody></tbody></table></div>
+  </section>
+
+  <section class="view" id="view-roles" hidden>
+    <div class="toolbar">
+      <div class="lb-tabs" id="lbTabs"></div>
+      <div class="grow"></div>
+      <button class="btn" id="editLaufbahnen">Grundeinstellungen</button>
+      <button class="btn primary" id="addStufe">+ Stufe</button>
+    </div>
+    <p class="hint" style="margin:-6px 0 14px">Jede Stufe beschreibt Sinn, Ergebnisse, Verantwortung, Schnittstellen und Entscheidungsrahmen (Schema des Beraters) sowie Pflichten, Benefits und Gehaltsstufe. Status „Entwurf“ bis zur Abstimmung im Workshop.</p>
+    <div class="ladder" id="ladder"></div>
+  </section>
+
+  <section class="view" id="view-eval" hidden>
+    <div class="stats" id="stats"></div>
+    <div class="roadmap">
+      <h3>Fahrplan Organisationsentwicklung</h3>
+      <ol>
+        <li><strong>Bis 26.10.:</strong> Martin, Mirko, Mike prüfen das Organigramm und teilen die Mitarbeiter ein (Reiter „Mitarbeiter“, Haken „Einstufung geprüft“). Abgleich mit der Gehaltsstruktur (Reiter „Rollen &amp; Stufen“).</li>
+        <li><strong>Phase 1:</strong> Schlüsselfiguren festlegen (Stern bei der Person) und Workshop-Termin planen.</li>
+        <li><strong>Phase 2:</strong> Rollen als 60-%-Version vorbereiten, im Workshop fertig abstimmen (Status „abgestimmt“).</li>
+        <li><strong>Phase 3:</strong> Workshop – Leitbild, Führungsprinzipien, Rollen präsentieren und Praxistest.</li>
+        <li><strong>Phase 4:</strong> Restliche Rollen mit Führungskräften entwickeln, Konzept für Mitarbeitergespräche und Entgeltsystem, Training Führung. Ziel: bis 31.12.2026 alles klar.</li>
+      </ol>
+    </div>
+    <div class="toolbar" style="margin-top:14px"><button class="btn" id="exportBtn">Export als JSON</button><span class="hint">Für den Berater oder als Sicherung.</span></div>
+  </section>
+
+  <div class="empty" id="emptyState" hidden>
+    <h2>Noch keine Daten</h2>
+    <p>Hier erscheinen Geschäftsführung, Bereiche, Abteilungen, Mitarbeiter und Rollenprofile, sobald der erste Datensatz angelegt ist.</p>
+  </div>
+</main>
+
+<div id="drawerRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(function(){
+"use strict";
+const $ = (s, r=document) => r.querySelector(s);
+const el = (tag, attrs={}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "style") n.style.cssText = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat(Infinity)) if (k !== null && k !== undefined && k !== false) n.append(k.nodeType ? k : document.createTextNode(k));
+  return n;
+};
+const DEFAULT_PHASES = [
+  {n:1, name:"Vor dem Auftrag"},
+  {n:2, name:"Im Auftrag"},
+  {n:3, name:"Nach dem Auftrag"},
+  {n:4, name:"Unterstützend"},
+];
+const DEFAULT_CONFIG = { gfs: [], laufbahnen: [], kriterien: [], phasen: DEFAULT_PHASES };
+const phases = () => { const p=cfg().phasen; return (Array.isArray(p)&&p.length) ? p.map(x=>({n:+x.n,name:x.name,color:"var(--accent)"})) : DEFAULT_PHASES.map(x=>({...x,color:"var(--accent)"})); };
+const PROFILE_FIELDS = [
+  ["sinn","Sinn der Rolle","Warum gebraucht? Beitrag zum Ganzen?"],
+  ["ergebnisse","Ergebnis und Wirkung","Woran erkennen wir, ob erfolgreich? 2–4 Ergebnisse"],
+  ["verantwortung","Verantwortung","Für welche Themen steht die Rolle ein? 5–6 Themen"],
+  ["schnittstellen","Schnittstellen","Mit wem muss die Rolle wie zusammenarbeiten?"],
+  ["entscheidet","Entscheidet selbst","Welche Entscheidungen darf die Rolle eigenständig treffen?"],
+  ["abstimmung","Stimmt sich ab","Wo braucht es Abstimmung, Eskalation oder Freigabe?"],
+  ["pflichten","Aufgaben und Pflichten","Konkrete, regelmäßige Aufgaben dieser Stufe"],
+  ["benefits","Benefits","Was bringt die Stufe mit sich (Fahrzeug, Weiterbildung, Zulagen …)?"],
+  ["gehalt","Gehaltsstufe","Einstufung laut Kollektivvertrag / interner Gehaltsstruktur"],
+];
+// Two kinds of organisational unit share one assignment model: person[field][unitId] = "V" | "S" | "M"
+const KINDS = {
+  bereiche:    {coll:"bereiche",    field:"bereiche",    label:"Bereich",    labelV:"Verantwortlich", labelS:"Stellvertretung"},
+  abteilungen: {coll:"abteilungen", field:"abteilungen", label:"Abteilung",  labelV:"Leitung",        labelS:"Stellvertretung"},
+};
+const ROLE_ORDER = {V:0,S:1,M:2};
+
+// ---------- State ----------
+const S = {
+  db:null, canWrite:null, view:"org", lbSel:null,
+  config:null, people:{}, bereiche:{}, abteilungen:{}, stufen:{},
+  loaded:{config:false,people:false,bereiche:false,abteilungen:false,stufen:false},
+  highlight:"", drag:null, user:"", lastSync:"",
+};
+const readOnly = () => S.canWrite === false || !S.db;
+const cfg = () => S.config || DEFAULT_CONFIG;
+const peopleList = () => Object.values(S.people).sort((a,b)=>a.name.localeCompare(b.name,"de"));
+const bereichList = () => Object.values(S.bereiche).sort((a,b)=>(a.phase-b.phase)||((a.order??99)-(b.order??99))||a.name.localeCompare(b.name,"de"));
+const abtList = () => Object.values(S.abteilungen).sort((a,b)=>((a.order??99)-(b.order??99))||a.name.localeCompare(b.name,"de"));
+const abtChildren = pid => abtList().filter(a=>(a.parent||"")===(pid||""));
+const abtPath = a => { const parts=[]; let cur=a, guard=0; while(cur && guard++<20){ parts.unshift(cur.name); cur=S.abteilungen[cur.parent]; } return parts.join(" › "); };
+const unitsOf = kind => kind==="bereiche" ? S.bereiche : S.abteilungen;
+const stufenOf = lb => Object.values(S.stufen).filter(s=>s.laufbahn===lb).sort((a,b)=>(a.order??99)-(b.order??99));
+const lbName = id => (cfg().laufbahnen.find(l=>l.id===id)||{}).name || id || "–";
+const stufeName = (lb,id) => { const s = Object.values(S.stufen).find(x=>x.laufbahn===lb && x.id===id); return s ? s.name : (id||"–"); };
+const avgRating = p => { const v = Object.values(p.bewertung||{}).filter(x=>x>0); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
+const slug = s => s.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || ("x"+Date.now());
+const roleOf = (p,kind,id) => (p[KINDS[kind].field]||{})[id] || "";
+const membersOf = (kind,id) => peopleList().filter(p=>roleOf(p,kind,id)).sort((a,b)=>(ROLE_ORDER[roleOf(a,kind,id)]-ROLE_ORDER[roleOf(b,kind,id)])||a.name.localeCompare(b.name,"de"));
+const stufeShort = p => { const s=stufeName(p.laufbahn,p.stufe); return s==="–"?"":s; };
+const extTag = p => p.extern ? el("span",{class:"ext",title:"Externer Mitarbeiter"},"ext") : null;
+const fmtDate = d => { if(!d) return ""; const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d); return m? `${m[3]}.${m[2]}.${m[1]}` : d; };
+
+// ---------- Toast / writes / status ----------
+let toastT;
+function toast(msg){ const r=$("#toastRoot"); r.replaceChildren(el("div",{class:"toast"},msg)); clearTimeout(toastT); toastT=setTimeout(()=>r.replaceChildren(),2800); }
+async function save(path, data){
+  const [coll,id]=path.split("/");
+  const body={...data}; if(coll!=="stufen") delete body.id; body.updated=new Date().toISOString();
+  try { await SP.set(coll,id,body); return true; }
+  catch(e){ console.error(e); if (e&&e.status===403){ S.canWrite=false; setStatus(); toast("Keine Schreibrechte auf der SharePoint-Liste"); } else toast("Speichern fehlgeschlagen: "+(e&&e.message||e)); return false; }
+}
+async function remove(path){
+  const [coll,id]=path.split("/");
+  try { await SP.remove(coll,id); return true; } catch(e){ console.error(e); toast("Löschen fehlgeschlagen"); return false; }
+}
+function setStatus(){
+  const d=$("#statusDot"), t=$("#statusText");
+  if (!S.db){ d.className="dot"; t.textContent=S.user?("Angemeldet: "+S.user):"Nicht angemeldet"; return; }
+  if (S.canWrite===false){ d.className="dot ro"; t.textContent="Nur Lesen · "+S.user; return; }
+  d.className="dot ok"; t.textContent="SharePoint · "+S.user+(S.lastSync?" · "+S.lastSync:"");
+}
+
+// ---------- Tabs ----------
+$("#tabs").addEventListener("click", e=>{
+  const b=e.target.closest(".tab"); if(!b) return;
+  S.view=b.dataset.view;
+  for (const t of $("#tabs").children) t.setAttribute("aria-selected", t===b);
+  try{ localStorage.setItem("haller-view", S.view);}catch(_){}
+  render();
+});
+try{ const v=localStorage.getItem("haller-view"); if(v && $(`.tab[data-view="${v}"]`)){ S.view=v; for(const t of $("#tabs").children) t.setAttribute("aria-selected", t.dataset.view===v);} }catch(_){}
+
+// ---------- Drag & drop ----------
+function makeDraggable(chip, pid, kind, unitId){
+  if (readOnly()) { chip.style.cursor="pointer"; return; }
+  chip.draggable=true;
+  chip.addEventListener("dragstart", e=>{ S.drag={pid,kind,unitId}; chip.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{e.dataTransfer.setData("text/plain",pid);}catch(_){} });
+  chip.addEventListener("dragend", ()=>{ chip.classList.remove("dragging"); S.drag=null; });
+}
+function dropZone(node, kind, unitId, role){
+  if (readOnly()) return node;
+  node.addEventListener("dragover", e=>{ if(!S.drag) return; e.preventDefault(); e.dataTransfer.dropEffect="move"; node.classList.add("over"); });
+  node.addEventListener("dragleave", ()=>node.classList.remove("over"));
+  node.addEventListener("drop", e=>{ e.preventDefault(); e.stopPropagation(); node.classList.remove("over"); const d=S.drag; S.drag=null; if(d) assignDrop(d, kind, unitId, role); });
+  return node;
+}
+async function assignDrop(d, kind, unitId, role){
+  const K=KINDS[kind]; const p=S.people[d.pid]; if(!p) return;
+  const doc={...p, [K.field]:{...(p[K.field]||{})}};
+  const sameUnit = d.kind===kind && d.unitId===unitId;
+  if (d.kind===kind && d.unitId && !sameUnit) delete doc[K.field][d.unitId];   // move between units of the same kind
+  if (sameUnit && doc[K.field][unitId]===role) return;
+  doc[K.field][unitId]=role;
+  // one V and one S per unit: demote the previous holder
+  const demote = (role==="V"||role==="S") ? membersOf(kind,unitId).filter(x=>x.id!==p.id && roleOf(x,kind,unitId)===role) : [];
+  if (!await save("people/"+p.id, doc)) return;
+  for (const x of demote){ const xd={...x,[K.field]:{...(x[K.field]||{})}}; xd[K.field][unitId]="M"; await save("people/"+x.id, xd); }
+  const unit=unitsOf(kind)[unitId];
+  toast(`${p.name} → ${unit?unit.name:""} (${role==="V"?K.labelV:role==="S"?K.labelS:"wirkt mit"})`);
+}
+
+// ---------- Shared unit card ----------
+function personChip(p, role, kind, unitId){
+  const unchecked = !p.stufeGeprueft;
+  const c = el("button",{class:"chip"+(role==="V"?" v":role==="S"?" s":"")+(unchecked?" unchecked":"")+(p.extern?" extern":"")+(S.highlight===p.id?" highlight":""),
+    title:(role==="V"?"verantwortlich":role==="S"?"Stellvertretung":role==="M"?"wirkt mit":"")+(unchecked?" · Einstufung noch nicht geprüft":"")+(p.extern?" · extern":"")+" · ziehen zum Verschieben", onclick:()=>openPerson(p.id)},
+    el("span",{class:"lead"}), p.name, extTag(p), el("span",{class:"lvl"}, stufeShort(p)));
+  if (kind) makeDraggable(c, p.id, kind, unitId);
+  return c;
+}
+function countBadge(ist, soll){
+  if (!soll) return el("span",{class:"count",title:"Besetzung (Soll nicht festgelegt)"}, ist+" Pers.");
+  const cls = ist<soll?"under":ist>soll?"over":"ok";
+  return el("span",{class:"count "+cls,title:cls==="under"?"Unterbesetzt":cls==="over"?"Überbesetzt":"Besetzung passt"}, `${ist} / Soll ${soll}`);
+}
+function unitCard(kind, u, opts={}){
+  const K=KINDS[kind];
+  const members=membersOf(kind,u.id);
+  const vs=members.filter(p=>roleOf(p,kind,u.id)==="V"), ss=members.filter(p=>roleOf(p,kind,u.id)==="S"), ms=members.filter(p=>roleOf(p,kind,u.id)==="M");
+  const card=el("div",{class:"unit",style:opts.color?"--pc:"+opts.color:""});
+  card.append(el("div",{class:"unit-head"}, el("h3",{},u.name), u.gf?el("span",{class:"gf-tag"},"GF "+u.gf):null, countBadge(members.length,u.soll),
+    el("button",{class:"icon",title:K.label+" bearbeiten",onclick:()=>opts.onEdit(u.id)},"✎")));
+  const slotV=dropZone(el("div",{class:"slot"+(vs.length?"":" missing")}, el("span",{class:"lbl"},K.labelV), el("div",{class:"chips"}, vs.map(p=>personChip(p,"V",kind,u.id)))), kind,u.id,"V");
+  const slotS=dropZone(el("div",{class:"slot"+(ss.length?"":" missing")}, el("span",{class:"lbl"},K.labelS), el("div",{class:"chips"}, ss.map(p=>personChip(p,"S",kind,u.id)))), kind,u.id,"S");
+  card.append(el("div",{class:"slots"}, slotV, slotS));
+  if (!opts.onlyV) card.append(dropZone(el("div",{class:"members"}, el("span",{class:"lbl"},"Wirkt mit"), el("div",{class:"chips"}, ms.length?ms.map(p=>personChip(p,"M",kind,u.id)):el("span",{class:"hint"},"–"))), kind,u.id,"M"));
+  return card;
+}
+
+// ---------- Render ----------
+function render(){
+  for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-"+S.view;
+  const empty = Object.keys(S.people).length===0 && Object.keys(S.bereiche).length===0 && S.loaded.people && S.loaded.bereiche;
+  $("#emptyState").hidden = !empty;
+  if (S.view==="org") renderOrg();
+  else if (S.view==="abt") renderAbt();
+  else if (S.view==="people") renderPeople();
+  else if (S.view==="roles") renderRoles();
+  else renderEval();
+}
+function fillHighlight(sel){
+  const cur=sel.value;
+  sel.replaceChildren(el("option",{value:""},"Person hervorheben …"), ...peopleList().map(p=>el("option",{value:p.id},p.name)));
+  sel.value = S.people[cur]?cur:""; S.highlight=sel.value;
+}
+function renderOrg(){
+  fillHighlight($("#orgHighlight"));
+  const gfRow=$("#gfRow"); gfRow.replaceChildren();
+  for (const g of cfg().gfs){
+    const areas = bereichList().filter(b=>b.gf===g);
+    gfRow.append(el("div",{class:"gf-card"}, el("div",{class:"eyebrow"},"Geschäftsführung"), el("h3",{}, g),
+      el("ul",{}, areas.length? areas.map(b=>el("li",{},b.name)) : el("li",{style:"background:none;color:var(--faint)"},"noch keine Bereiche zugeordnet"))));
+  }
+  const onlyV=$("#onlyV").checked;
+  const root=$("#phases"); root.replaceChildren();
+  const known=new Set(phases().map(p=>p.n));
+  const orphans=bereichList().filter(b=>!known.has(b.phase));
+  const list=orphans.length? [...phases(), {n:-1, name:"Ohne Phase", color:"var(--warn)", orphan:true}] : phases();
+  for (const ph of list){
+    const col=el("div",{class:"phase",style:"--pc:"+ph.color});
+    col.append(el("div",{class:"phase-head"}, el("span",{class:"num"},ph.n), el("h2",{},ph.name)));
+    const body=el("div",{class:"phase-body"});
+    for (const b of (ph.orphan? orphans : bereichList().filter(x=>x.phase===ph.n))) body.append(unitCard("bereiche", b, {color:ph.color, onlyV, onEdit:openBereich}));
+    if (!ph.orphan) body.append(el("div",{class:"add-row"}, el("button",{class:"btn sm",disabled:readOnly(),onclick:()=>openBereich(null,ph.n)},"+ Bereich")));
+    else body.append(el("p",{class:"hint"},"Diese Bereiche gehören zu einer gelöschten Phase – über ✎ einer Phase zuordnen."));
+    col.append(body); root.append(col);
+  }
+}
+$("#orgHighlight").addEventListener("change", e=>{S.highlight=e.target.value; renderOrg();});
+$("#onlyV").addEventListener("change", renderOrg);
+
+function renderAbt(){
+  fillHighlight($("#abtHighlight"));
+  const root=$("#tree"); root.replaceChildren();
+  const build = a => {
+    const card=unitCard("abteilungen", a, {onEdit:openAbt});
+    const kids=abtChildren(a.id);
+    const ch=el("div",{class:"children"}, kids.map(build), el("div",{}, el("button",{class:"btn sm",disabled:readOnly(),onclick:()=>openAbt(null,a.id)},"+ Unterabteilung")));
+    card.append(ch);
+    return card;
+  };
+  const tops=abtChildren("");
+  if (!tops.length) root.append(el("p",{class:"hint"},"Noch keine Abteilungen. Mit „+ Abteilung“ anlegen; Unterabteilungen entstehen direkt in der Abteilung."));
+  for (const a of tops) root.append(build(a));
+}
+$("#abtHighlight").addEventListener("change", e=>{S.highlight=e.target.value; renderAbt();});
+$("#addAbt").addEventListener("click", ()=>openAbt(null,""));
+
+function renderPeople(){
+  const lbSel=$("#pLaufbahn"), abtSel=$("#pAbt");
+  const lbCur=lbSel.value, abtCur=abtSel.value;
+  lbSel.replaceChildren(el("option",{value:""},"Alle Laufbahnen"), ...cfg().laufbahnen.map(l=>el("option",{value:l.id},l.name)), el("option",{value:"__extern"},"Nur Externe"), el("option",{value:"__intern"},"Nur Interne"));
+  abtSel.replaceChildren(el("option",{value:""},"Alle Abteilungen"), ...abtList().map(a=>el("option",{value:a.id},abtPath(a))), el("option",{value:"__none"},"Ohne Abteilung"));
+  lbSel.value=lbCur; abtSel.value=abtCur;
+  const q=$("#pSearch").value.trim().toLowerCase();
+  const tb=$("#pTable tbody"); tb.replaceChildren();
+  let list=peopleList();
+  if (q) list=list.filter(p=>[p.name,p.notizen,p.aufgaben,p.taetigkeiten,p.staerken,p.schwaechen].join(" ").toLowerCase().includes(q));
+  if (lbSel.value==="__extern") list=list.filter(p=>p.extern); else if (lbSel.value==="__intern") list=list.filter(p=>!p.extern); else if (lbSel.value) list=list.filter(p=>p.laufbahn===lbSel.value);
+  if (abtSel.value==="__none") list=list.filter(p=>!Object.keys(p.abteilungen||{}).some(k=>S.abteilungen[k])); else if (abtSel.value) list=list.filter(p=>roleOf(p,"abteilungen",abtSel.value));
+  if ($("#pUnchecked").checked) list=list.filter(p=>!p.stufeGeprueft);
+  for (const p of list){
+    const areas=Object.entries(p.bereiche||{}).filter(([k])=>S.bereiche[k]); const vCount=areas.filter(([,r])=>r==="V").length;
+    const abts=Object.entries(p.abteilungen||{}).filter(([k])=>S.abteilungen[k]).sort((a,b)=>ROLE_ORDER[a[1]]-ROLE_ORDER[b[1]]);
+    const avg=avgRating(p);
+    tb.append(el("tr",{onclick:()=>openPerson(p.id)},
+      el("td",{class:"name-cell"}, p.name, " ", extTag(p), el("span",{class:"sub"}, (p.taetigkeiten||"").split("\n")[0]||"")),
+      el("td",{}, [el("span",{class:"badge"},lbName(p.laufbahn))," ",el("span",{class:"badge lvl"},stufeName(p.laufbahn,p.stufe)), p.stufeGeprueft?"":[" ",el("span",{class:"badge warn",title:"Einstufung noch nicht geprüft"},"zu prüfen")]]),
+      el("td",{}, abts.length? abts.map(([k,r])=>el("span",{class:"badge"+(r==="V"?" lvl":""),style:"margin:1px 2px 1px 0"},S.abteilungen[k].name+(r==="V"?" · Ltg":r==="S"?" · Stv":""))) : el("span",{style:"color:var(--warn)"},"keine")),
+      el("td",{}, areas.length? `${vCount} verantw. · ${areas.length-vCount} weitere` : el("span",{style:"color:var(--warn)"},"keine")),
+      el("td",{}, fmtDate(p.eintritt)||"–"),
+      el("td",{}, p.schluessel?el("span",{class:"flag",title:"Schlüsselfigur"},"★ "):"", p.fuehrung?el("span",{class:"flag",title:"zukünftige Führungskraft"},"↗"):""),
+      el("td",{}, avg? [el("span",{class:"meter"},el("i",{style:"width:"+(avg/5*100)+"%"}))," ",el("span",{class:"hint"},avg.toFixed(1))] : el("span",{class:"hint"},"–"))
+    ));
+  }
+  if (!list.length) tb.append(el("tr",{},el("td",{colspan:7,class:"hint"},"Keine Treffer.")));
+}
+for (const id of ["pSearch","pLaufbahn","pAbt","pUnchecked"]) $("#"+id).addEventListener("input", renderPeople);
+$("#addPerson").addEventListener("click", ()=>openPerson(null));
+
+function renderRoles(){
+  const lbs=cfg().laufbahnen;
+  if (!S.lbSel || !lbs.some(l=>l.id===S.lbSel)) S.lbSel = lbs[0] ? lbs[0].id : null;
+  $("#lbTabs").replaceChildren(...lbs.map(l=>el("button",{class:"lb-tab",role:"tab","aria-selected":String(l.id===S.lbSel),onclick:()=>{S.lbSel=l.id;renderRoles();}},l.name)));
+  const ladder=$("#ladder"); ladder.replaceChildren();
+  if (!S.lbSel){ ladder.append(el("p",{class:"hint"},"Noch keine Laufbahn angelegt. Über „Grundeinstellungen“ anlegen.")); return; }
+  const list=stufenOf(S.lbSel);
+  if (!list.length) ladder.append(el("p",{class:"hint"},"Noch keine Stufen in dieser Laufbahn."));
+  list.forEach((s,i)=>{
+    const who=peopleList().filter(p=>p.laufbahn===s.laufbahn && p.stufe===s.id);
+    const docId=s.laufbahn+"__"+s.id;
+    ladder.append(el("div",{class:"stufe",role:"button",tabindex:0,onclick:()=>openStufe(docId),onkeydown:e=>{if(e.key==="Enter")openStufe(docId);}},
+      el("div",{class:"step"}, String(i+1).padStart(2,"0")),
+      el("h3",{}, s.name),
+      el("div",{class:"meta"}, el("span",{class:"badge "+(s.status||"entwurf")}, s.status==="abgestimmt"?"abgestimmt":"Entwurf"), s.gehalt?el("span",{class:"badge"},"Gehalt: "+s.gehalt):null),
+      el("p",{}, s.sinn || "Sinn der Rolle noch nicht beschrieben."),
+      el("div",{class:"who"}, who.length? who.map(p=>el("span",{},p.name)) : el("span",{style:"background:none;color:var(--faint)"},"niemand eingestuft"))
+    ));
+  });
+}
+$("#addStufe").addEventListener("click", ()=>openStufe(null));
+$("#editLaufbahnen").addEventListener("click", openConfig);
+
+function renderEval(){
+  const root=$("#stats"); root.replaceChildren();
+  const people=peopleList();
+  const bar=(label,n,max)=>el("div",{class:"bar"}, el("span",{},label), el("div",{class:"track"},el("i",{style:"width:"+(max?Math.min(100,n/max*100):0)+"%"})), el("span",{class:"n"},n));
+  const link=(label,fn)=>el("li",{},el("button",{onclick:fn},label));
+  const ulOr=(items,okText)=> items.length? el("ul",{},items) : el("p",{class:"ok"},okText);
+
+  // Besetzung je Einheit
+  const staffing=(kind,label,onEdit)=>{
+    const K=KINDS[kind]; const units=kind==="bereiche"?bereichList():abtList();
+    const noV=[],noS=[],under=[],over=[],same=[];
+    for (const u of units){
+      const m=membersOf(kind,u.id); const vs=m.filter(p=>roleOf(p,kind,u.id)==="V"), ss=m.filter(p=>roleOf(p,kind,u.id)==="S");
+      const name=kind==="abteilungen"?abtPath(u):u.name;
+      if(!vs.length) noV.push(link(name,()=>onEdit(u.id)));
+      if(!ss.length) noS.push(link(name,()=>onEdit(u.id)));
+      if(vs.length>1) same.push(link(name+" ("+vs.map(p=>p.name).join(", ")+")",()=>onEdit(u.id)));
+      if(u.soll && m.length<u.soll) under.push(link(`${name}: ${m.length} von ${u.soll}`,()=>onEdit(u.id)));
+      if(u.soll && m.length>u.soll) over.push(link(`${name}: ${m.length} von ${u.soll}`,()=>onEdit(u.id)));
+    }
+    return el("div",{class:"stat"},el("h3",{},"Besetzung "+label),
+      el("div",{class:"eyebrow dangerline"},"Ohne "+K.labelV+" · "+noV.length), ulOr(noV,"Überall besetzt."),
+      el("div",{class:"eyebrow warnline",style:"margin-top:10px"},"Ohne "+K.labelS+" · "+noS.length), ulOr(noS,"Überall besetzt."),
+      same.length?[el("div",{class:"eyebrow warnline",style:"margin-top:10px"},"Mehrere "+K.labelV+" · "+same.length), el("ul",{},same)]:null,
+      el("div",{class:"eyebrow warnline",style:"margin-top:10px"},"Unterbesetzt (Ist < Soll) · "+under.length), ulOr(under,"Keine Unterbesetzung laut Soll."),
+      el("div",{class:"eyebrow dangerline",style:"margin-top:10px"},"Überbesetzt (Ist > Soll) · "+over.length), ulOr(over,"Keine Überbesetzung laut Soll."),
+      units.every(u=>!u.soll)?el("p",{class:"hint",style:"margin-top:8px"},"Soll-Besetzung noch nirgends festgelegt – im "+K.label+" unter ✎ eintragen."):null);
+  };
+  root.append(staffing("bereiche","Bereiche (nach Auftrag)",openBereich));
+  root.append(staffing("abteilungen","Abteilungen",openAbt));
+
+  // Personen: Last und Lücken
+  const load=people.map(p=>({p,v:Object.entries(p.bereiche||{}).filter(([k,r])=>S.bereiche[k]&&r==="V").length+Object.entries(p.abteilungen||{}).filter(([k,r])=>S.abteilungen[k]&&r==="V").length,
+      total:Object.keys(p.bereiche||{}).filter(k=>S.bereiche[k]).length+Object.keys(p.abteilungen||{}).filter(k=>S.abteilungen[k]).length}));
+  const heavy=load.filter(x=>x.v>=4).sort((a,b)=>b.v-a.v);
+  const noArea=people.filter(p=>!Object.keys(p.bereiche||{}).some(k=>S.bereiche[k]));
+  const noAbt=people.filter(p=>!Object.keys(p.abteilungen||{}).some(k=>S.abteilungen[k]));
+  const unchecked=people.filter(p=>!p.stufeGeprueft);
+  root.append(el("div",{class:"stat"},el("h3",{},"Personen: Last und Lücken"),
+    el("div",{class:"eyebrow warnline"},"Viele Verantwortungen (≥ 4) · "+heavy.length), ulOr(heavy.map(x=>link(`${x.p.name}: ${x.v} verantwortlich, ${x.total} Einheiten gesamt`,()=>openPerson(x.p.id))),"Niemand trägt 4 oder mehr Verantwortungen."),
+    el("div",{class:"eyebrow",style:"margin-top:10px"},"Ohne Bereich · "+noArea.length), ulOr(noArea.map(p=>link(p.name,()=>openPerson(p.id))),"Alle zugeordnet."),
+    el("div",{class:"eyebrow",style:"margin-top:10px"},"Ohne Abteilung · "+noAbt.length), ulOr(noAbt.map(p=>link(p.name,()=>openPerson(p.id))),"Alle zugeordnet."),
+    el("div",{class:"eyebrow",style:"margin-top:10px"},"Einstufung zu prüfen · "+unchecked.length), ulOr(unchecked.map(p=>link(p.name,()=>openPerson(p.id))),"Alle geprüft.")));
+
+  // Stufen
+  const card1=el("div",{class:"stat"},el("h3",{},"Mitarbeiter je Laufbahn und Stufe"));
+  for (const lb of cfg().laufbahnen){
+    const inLb=people.filter(p=>p.laufbahn===lb.id); if(!inLb.length) continue;
+    card1.append(el("div",{class:"eyebrow",style:"margin:10px 0 4px"},lb.name+" · "+inLb.length));
+    const st=stufenOf(lb.id); const max=Math.max(1,...st.map(s=>inLb.filter(p=>p.stufe===s.id).length));
+    for (const s of st) card1.append(bar(s.name, inLb.filter(p=>p.stufe===s.id).length, max));
+    const none=inLb.filter(p=>!st.some(s=>s.id===p.stufe)).length; if(none) card1.append(bar("ohne Stufe",none,max));
+  }
+  root.append(card1);
+
+  // Schlüssel / Führung / Bewertung
+  const keys=people.filter(p=>p.schluessel), leads=people.filter(p=>p.fuehrung);
+  root.append(el("div",{class:"stat"},el("h3",{},"Schlüsselfiguren und Führungspotenzial"),
+    el("div",{class:"eyebrow"},"★ Schlüsselfiguren · "+keys.length), keys.length? el("ul",{},keys.map(p=>link(p.name+" – "+stufeShort(p),()=>openPerson(p.id)))) : el("p",{class:"hint"},"Noch keine markiert (Stern bei der Person)."),
+    el("div",{class:"eyebrow",style:"margin-top:10px"},"Externe Mitarbeiter · "+people.filter(p=>p.extern).length), people.filter(p=>p.extern).length? el("ul",{},people.filter(p=>p.extern).map(p=>link(p.name+" – "+stufeShort(p),()=>openPerson(p.id)))) : el("p",{class:"hint"},"Keine externen Mitarbeiter erfasst."),
+    el("div",{class:"eyebrow",style:"margin-top:10px"},"↗ Zukünftige Führungskräfte · "+leads.length), leads.length? el("ul",{},leads.map(p=>link(p.name+" – "+stufeShort(p),()=>openPerson(p.id)))) : el("p",{class:"hint"},"Noch keine markiert.")));
+  const rated=people.filter(p=>avgRating(p)>0).sort((a,b)=>avgRating(b)-avgRating(a));
+  const c4=el("div",{class:"stat"},el("h3",{},"Bewertung (Durchschnitt)"));
+  if(!rated.length) c4.append(el("p",{class:"hint"},"Noch keine Bewertungen eingetragen."));
+  for (const p of rated.slice(0,15)) c4.append(bar(p.name, +avgRating(p).toFixed(1), 5));
+  root.append(c4);
+  // Rollenprofile
+  const all=Object.values(S.stufen); const done=all.filter(s=>s.status==="abgestimmt").length;
+  const filled=all.filter(s=>PROFILE_FIELDS.slice(0,6).every(([k])=>s[k])).length;
+  root.append(el("div",{class:"stat"},el("h3",{},"Rollenprofile"),
+    bar("abgestimmt",done,all.length||1), bar("vollständig beschrieben",filled,all.length||1), bar("gesamt",all.length,all.length||1),
+    el("p",{class:"hint",style:"margin-top:8px"},"Vollständig = die sechs Felder des Berater-Schemas sind ausgefüllt.")));
+  // GF
+  const c6=el("div",{class:"stat"},el("h3",{},"Bereiche je Geschäftsführer"));
+  const bl=bereichList(); const maxG=Math.max(1,...cfg().gfs.map(g=>bl.filter(b=>b.gf===g).length));
+  for (const g of cfg().gfs) c6.append(bar(g, bl.filter(b=>b.gf===g).length, maxG));
+  const unassigned=bl.filter(b=>!b.gf).length; if(unassigned) c6.append(bar("ohne GF",unassigned,maxG));
+  root.append(c6);
+}
+function downloadFile(name, text, type){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); }
+// ---------- Druckversion (eigenständige HTML-Datei, A4 quer) ----------
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function printUnit(kind,u){
+  const m=membersOf(kind,u.id); const r=p=>roleOf(p,kind,u.id);
+  const vs=m.filter(p=>r(p)==="V"), ss=m.filter(p=>r(p)==="S"), ms=m.filter(p=>r(p)==="M");
+  const nm=p=>esc(p.name)+(p.extern?' <i class="ext">ext</i>':"");
+  const sollTxt=u.soll?` · ${m.length}/${u.soll}`:"";
+  return `<div class="u"><div class="uh"><b>${esc(u.name)}</b><span>${u.gf?"GF "+esc(u.gf):""}${sollTxt}</span></div>`+
+    `<div class="row"><em>${KINDS[kind].labelV}:</em> ${vs.length?vs.map(nm).join(", "):'<s>offen</s>'}</div>`+
+    `<div class="row"><em>${KINDS[kind].labelS}:</em> ${ss.length?ss.map(nm).join(", "):'<s>offen</s>'}</div>`+
+    (ms.length?`<div class="row mm">${ms.map(nm).join(" · ")}</div>`:"")+`</div>`;
+}
+function printHtml(kind){
+  const date=new Date().toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+  const title = kind==="bereiche" ? "Organigramm nach Wertschöpfung" : "Organigramm nach Abteilungen";
+  let body="";
+  if (kind==="bereiche"){
+    body += `<div class="gfs">`+cfg().gfs.map(g=>`<div class="gf"><small>Geschäftsführung</small><b>${esc(g)}</b><span>${bereichList().filter(b=>b.gf===g).map(b=>esc(b.name)).join(" · ")||"–"}</span></div>`).join("")+`</div>`;
+    body += `<div class="cols">`+phases().map(ph=>`<div class="col"><div class="ph"><span>${ph.n}</span>${esc(ph.name)}</div>`+bereichList().filter(b=>b.phase===ph.n).map(b=>printUnit(kind,b)).join("")+`</div>`).join("")+`</div>`;
+  } else {
+    const build=a=>printUnit(kind,a)+(abtChildren(a.id).length?`<div class="kids">${abtChildren(a.id).map(build).join("")}</div>`:"");
+    body += `<div class="cols tree">`+abtChildren("").map(a=>`<div class="col">${build(a)}</div>`).join("")+`</div>`;
+  }
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${esc(title)} – Elektro A. Haller</title><style>
+@page{size:A4 landscape;margin:10mm}
+body{font:10.5px/1.3 "Segoe UI",Arial,sans-serif;color:#1c231a;margin:0;padding:10mm;background:#fff}
+@media print{body{padding:0}.noprint{display:none}}
+h1{font-size:17px;margin:0 0 2px}.meta{color:#5f6a58;margin-bottom:8px;font-size:10px}
+.noprint{background:#eef1ea;padding:6px 10px;border-radius:6px;margin-bottom:10px;font-size:11px}
+.gfs{display:flex;gap:6px;margin-bottom:8px}.gf{flex:1;border:1px solid #c9d1c0;border-radius:5px;padding:4px 7px}.gf small{display:block;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#5f6a58}.gf b{display:block;font-size:12px}.gf span{font-size:9px;color:#5f6a58}
+.cols{display:grid;grid-template-columns:repeat(${kind==="bereiche"?phases().length:"auto-fit,minmax(180px,1fr)"},1fr);gap:7px;align-items:start}
+.ph{font-weight:700;font-size:11px;border-bottom:2px solid #0a8a3c;padding-bottom:3px;margin-bottom:5px}.ph span{display:inline-block;background:#0a8a3c;color:#fff;border-radius:50%;width:15px;height:15px;text-align:center;line-height:15px;font-size:9px;margin-right:5px}
+.u{border:1px solid #c9d1c0;border-radius:5px;padding:4px 6px;margin-bottom:5px;break-inside:avoid}.uh{display:flex;justify-content:space-between;gap:6px;align-items:baseline}.uh b{font-size:11px}.uh span{font-size:9px;color:#5f6a58;white-space:nowrap}
+.row{font-size:9.5px}.row em{font-style:normal;color:#5f6a58}.row s{color:#b7791f;text-decoration:none;font-style:italic}.mm{color:#444;margin-top:1px}
+.kids{margin-left:8px;padding-left:6px;border-left:1.5px solid #c9d1c0}
+i.ext{font-style:normal;font-size:7px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#b7791f;border:1px solid #b7791f;border-radius:3px;padding:0 2px;vertical-align:middle}
+</style></head><body>
+<div class="noprint">Falls der Druckdialog nicht automatisch erscheint: Strg+P (Mac: ⌘+P) – Querformat ist voreingestellt. Diese Datei ist ein Schnappschuss vom ${date}.</div>
+<h1>${esc(title)}</h1><div class="meta">Elektro A. Haller · Stand ${date} · Verantwortlich / Stellvertretung / wirkt mit · Zahl = Ist/Soll · <i class="ext">ext</i> = extern</div>${body}</body></html>`;
+}
+async function downloadPrint(kind){
+  const html=printHtml(kind);
+  const name=(kind==="bereiche"?"organigramm-wertschoepfung-":"organigramm-abteilungen-")+new Date().toISOString().slice(0,10)+".html";
+  const w=window.open("","_blank");
+  if (w){ w.document.open(); w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(_){ } }, 400); }
+  else { downloadFile(name, html, "text/html"); toast("Druckdatei gespeichert – im Browser öffnen und drucken"); }
+}
+$("#printOrg").addEventListener("click", ()=>downloadPrint("bereiche"));
+$("#printAbt").addEventListener("click", ()=>downloadPrint("abteilungen"));
+
+$("#exportBtn").addEventListener("click", async ()=>{
+  const data={exportiert:new Date().toISOString(), config:cfg(), personen:S.people, bereiche:S.bereiche, abteilungen:S.abteilungen, stufen:S.stufen};
+  const json=JSON.stringify(data,null,2);
+  downloadFile("haller-organisation-"+new Date().toISOString().slice(0,10)+".json", json, "application/json"); toast("Export gespeichert");
+});
+
+// ---------- Drawer ----------
+function closeDrawer(){ $("#drawerRoot").replaceChildren(); render(); }
+function drawer(title, bodyKids, footKids){
+  const root=$("#drawerRoot");
+  root.replaceChildren(
+    el("div",{class:"scrim",onclick:closeDrawer}),
+    el("aside",{class:"drawer",role:"dialog","aria-label":title},
+      el("div",{class:"drawer-head"}, el("h2",{},title), el("button",{class:"btn sm",onclick:closeDrawer},"Schließen")),
+      el("div",{class:"drawer-body"}, bodyKids),
+      el("div",{class:"drawer-foot"}, footKids)));
+  const f=root.querySelector("input,select,textarea"); if(f) f.focus();
+}
+function field(label, input, help){ return el("div",{class:"field"}, el("label",{for:input.id},label), input, help?el("span",{class:"help"},help):null); }
+function textInput(id,val,ph){ return el("input",{type:"text",id,value:val||"",placeholder:ph||""}); }
+function numInput(id,val,min,max){ return el("input",{type:"number",id,value:(val??"")===""?"":val,min,max}); }
+function textArea(id,val,ph){ const t=el("textarea",{id,placeholder:ph||""}); t.value=val||""; return t; }
+function selectInput(id,opts,val){ const s=el("select",{id}); for(const [v,l] of opts) s.append(el("option",{value:v},l)); s.value=val??""; if(s.value!==(val??"")) s.value=opts.length?opts[0][0]:""; return s; }
+function checkbox(id,label,val){ const c=el("input",{type:"checkbox",id}); c.checked=!!val; return el("label",{class:"check",for:id}, c, label); }
+function deleteBlock(label,onConfirm,note){
+  const box=el("div",{});
+  const btn=el("button",{class:"btn danger",disabled:readOnly(),onclick:()=>{box.replaceChildren(el("div",{class:"confirm"},label+" wirklich löschen?"+(note?" "+note:""), el("button",{class:"btn sm danger",onclick:onConfirm},"Ja, löschen"), el("button",{class:"btn sm",onclick:()=>{box.replaceChildren(btn);}},"Abbrechen")));}},"Löschen");
+  box.append(btn); return box;
+}
+function uniqueId(map, base){ let id=base,i=2; while(map[id]) id=base+"-"+(i++); return id; }
+function segRow(state, key, label, cls){
+  const seg=el("div",{class:"seg"});
+  const mk=(v,l,t)=>el("button",{type:"button","data-v":v,title:t,"aria-pressed":String((state[key]||"")===v),onclick:()=>{ if((state[key]||"")===v) delete state[key]; else state[key]=v; for(const x of seg.children) x.setAttribute("aria-pressed",String((state[key]||"")===x.dataset.v)); }},l);
+  seg.append(mk("V","V","Verantwortlich / Leitung"),mk("S","S","Stellvertretung"),mk("M","M","Wirkt mit"));
+  return [el("span",{class:cls||""},label), seg];
+}
+
+// Person
+function openPerson(id){
+  const base=id?S.people[id]:null;
+  const p = base ? {...base, bereiche:{...(base.bereiche||{})}, abteilungen:{...(base.abteilungen||{})}, bewertung:{...(base.bewertung||{})}}
+                 : {name:"",laufbahn:(cfg().laufbahnen[0]||{}).id||"",stufe:"",stufeGeprueft:false,gf:"",extern:false,schluessel:false,fuehrung:false,bereiche:{},abteilungen:{},bewertung:{},taetigkeiten:"",sprache:"",standort:"",eintritt:"",aufgaben:"",staerken:"",schwaechen:"",entwicklung:"",notizen:""};
+  const isNew=!id;
+  const name=textInput("f-name",p.name,"Vor- und Nachname");
+  const lb=selectInput("f-lb",cfg().laufbahnen.map(l=>[l.id,l.name]),p.laufbahn);
+  const st=el("select",{id:"f-st"});
+  const profileBox=el("div",{});
+  const renderProfile=()=>{
+    const s=Object.values(S.stufen).find(x=>x.laufbahn===lb.value && x.id===st.value);
+    profileBox.replaceChildren();
+    if(!s) return;
+    profileBox.append(el("div",{class:"profile-box"}, el("h4",{},"Rollenprofil „"+s.name+"“ "), el("span",{class:"badge "+(s.status||"entwurf")}, s.status==="abgestimmt"?"abgestimmt":"Entwurf"),
+      el("dl",{}, ...PROFILE_FIELDS.filter(([k])=>s[k]).map(([k,l])=>[el("dt",{},l),el("dd",{},s[k])])),
+      el("button",{class:"btn sm",style:"margin-top:8px",onclick:()=>openStufe(s.laufbahn+"__"+s.id)},"Profil öffnen")));
+  };
+  const fillSt=()=>{ st.replaceChildren(el("option",{value:""},"– Stufe wählen –"), ...stufenOf(lb.value).map(s=>el("option",{value:s.id},s.name))); st.value=p.stufe||""; if(st.value!==(p.stufe||"")) st.value=""; renderProfile(); };
+  lb.addEventListener("change",()=>{p.stufe="";fillSt();}); st.addEventListener("change",renderProfile); fillSt();
+  const gf=selectInput("f-gf",[["","– keine –"],...cfg().gfs.map(g=>[g,g])],p.gf);
+  const ext=checkbox("f-ext","Externer Mitarbeiter (wird wie intern geführt, erhält die Markierung „ext“)",p.extern);
+  const chk=checkbox("f-chk","Einstufung geprüft (Martin / Mirko / Mike)",p.stufeGeprueft);
+  const key=checkbox("f-key","★ Schlüsselfigur",p.schluessel);
+  const lead=checkbox("f-lead","↗ Zukünftige Führungskraft",p.fuehrung);
+  const taet=textArea("f-taet",p.taetigkeiten,"Qualifikationen und Funktionen, eine je Zeile (z. B. KNX-Techniker, Erste Hilfe, Hubarbeitsbühne)");
+  const sprache=textInput("f-spr",p.sprache,"Deutsch / Italienisch …");
+  const standort=textInput("f-std",p.standort,"Pillhof …");
+  const eintritt=el("input",{type:"date",id:"f-ein",value:p.eintritt||""});
+  // Abteilungen
+  const abtAssign=el("div",{class:"assign"});
+  const walk=(parent,depth)=>{ for (const a of abtChildren(parent)){ abtAssign.append(...segRow(p.abteilungen,a.id,a.name,depth?"indent":"")); walk(a.id,depth+1);} };
+  walk("",0);
+  // Bereiche
+  const assign=el("div",{class:"assign"});
+  for (const ph of phases()){
+    const bs=bereichList().filter(b=>b.phase===ph.n); if(!bs.length) continue;
+    assign.append(el("div",{class:"ph",style:"--pc:"+ph.color},ph.n+" · "+ph.name));
+    for (const b of bs) assign.append(...segRow(p.bereiche,b.id,b.name));
+  }
+  // Bewertung
+  const rating=el("div",{class:"rating"});
+  for (const k of cfg().kriterien){
+    const stars=el("div",{class:"stars"});
+    const paint=()=>{ [...stars.children].forEach((b,i)=>b.classList.toggle("on", i < (p.bewertung[k.id]||0))); };
+    for (let i=1;i<=5;i++) stars.append(el("button",{type:"button","aria-label":k.name+" "+i,onclick:()=>{ p.bewertung[k.id] = p.bewertung[k.id]===i ? 0 : i; paint(); }},"●"));
+    paint(); rating.append(el("span",{},k.name), stars);
+  }
+  const aufg=textArea("f-aufg",p.aufgaben,"Konkrete Aufgaben dieser Person (zusätzlich zum Rollenprofil)");
+  const stae=textArea("f-stae",p.staerken,"Was läuft gut? Besondere Fähigkeiten");
+  const schw=textArea("f-schw",p.schwaechen,"Wo braucht es Unterstützung oder Entwicklung?");
+  const entw=textArea("f-entw",p.entwicklung,"Nächster Schritt, Weiterbildung, Perspektive");
+  const notes=textArea("f-notes",p.notizen,"Interne Notizen für das Mitarbeitergespräch");
+  const body=[
+    field("Name",name),
+    el("div",{class:"row2"}, field("Laufbahn",lb), field("Stufe",st)),
+    profileBox,
+    chk, ext,
+    el("div",{class:"row3"}, field("Zuständiger GF",gf), field("Sprache",sprache), field("Eintritt",eintritt)),
+    field("Standort",standort),
+    field("Tätigkeiten / Qualifikationen",taet),
+    el("fieldset",{}, el("legend",{},"Rolle in der Organisation"), key, lead),
+    el("fieldset",{}, el("legend",{},"Abteilungen – V = Leitung, S = Stellvertretung, M = Mitglied"), abtAssign.children.length?abtAssign:el("p",{class:"hint"},"Noch keine Abteilungen angelegt.")),
+    el("fieldset",{}, el("legend",{},"Bereiche nach Auftrag – V = verantwortlich, S = Stellvertretung, M = wirkt mit"), assign.children.length?assign:el("p",{class:"hint"},"Noch keine Bereiche angelegt.")),
+    el("fieldset",{}, el("legend",{},"Bewertung (1–5, erneut klicken zum Löschen)"), rating.children.length?rating:el("p",{class:"hint"},"Keine Kriterien definiert – in den Grundeinstellungen anlegen.")),
+    el("div",{class:"row2"}, field("Stärken",stae), field("Schwächen",schw)),
+    field("Aufgaben",aufg), field("Entwicklung",entw), field("Notizen",notes),
+  ];
+  const saveBtn=el("button",{class:"btn primary",disabled:readOnly(),onclick:async()=>{
+    const n=name.value.trim(); if(!n){ toast("Name fehlt"); name.focus(); return; }
+    const pid = id || uniqueId(S.people, slug(n));
+    const clean=(o,map)=>Object.fromEntries(Object.entries(o).filter(([k])=>map[k]));
+    const doc={name:n,laufbahn:lb.value,stufe:st.value,stufeGeprueft:$("#f-chk").checked,gf:gf.value,extern:$("#f-ext").checked,schluessel:$("#f-key").checked,fuehrung:$("#f-lead").checked,
+      bereiche:clean(p.bereiche,S.bereiche),abteilungen:clean(p.abteilungen,S.abteilungen),bewertung:p.bewertung,
+      taetigkeiten:taet.value,sprache:sprache.value,standort:standort.value,eintritt:eintritt.value,
+      aufgaben:aufg.value,staerken:stae.value,schwaechen:schw.value,entwicklung:entw.value,notizen:notes.value};
+    saveBtn.disabled=true;
+    if (await save("people/"+pid, doc)) { toast(isNew?"Mitarbeiter angelegt":"Gespeichert"); closeDrawer(); } else saveBtn.disabled=false;
+  }},"Speichern");
+  const foot=[ isNew?null:deleteBlock(p.name, async()=>{ if(await remove("people/"+id)){toast("Gelöscht");closeDrawer();} }), el("span",{class:"spacer"}), el("button",{class:"btn",onclick:closeDrawer},"Abbrechen"), saveBtn ];
+  drawer(isNew?"Neuer Mitarbeiter":p.name, body, foot);
+}
+
+// Bereich
+function openBereich(id, phase){
+  const b = id ? {...S.bereiche[id]} : {name:"",phase:phase||1,gf:"",beschreibung:"",order:99,soll:""};
+  const isNew=!id;
+  const name=textInput("b-name",b.name,"z. B. Angebotswesen");
+  const ph=selectInput("b-ph",phases().map(p=>[String(p.n),p.n+" · "+p.name]),String(b.phase));
+  const gf=selectInput("b-gf",[["","– keine –"],...cfg().gfs.map(g=>[g,g])],b.gf);
+  const ord=numInput("b-ord",b.order??99,1,99);
+  const soll=numInput("b-soll",b.soll||"",0,99);
+  const desc=textArea("b-desc",b.beschreibung,"Was gehört zu diesem Bereich? Was nicht?");
+  const members = id ? membersOf("bereiche",id) : [];
+  const body=[ field("Bereich",name), el("div",{class:"row3"}, field("Phase",ph), field("Reihenfolge",ord), field("Soll-Besetzung",soll,"Personen gesamt")), field("Zuständiger Geschäftsführer",gf), field("Beschreibung",desc),
+    id? el("fieldset",{}, el("legend",{},"Zugeordnete Personen (Rolle per Drag & Drop im Organigramm oder bei der Person ändern)"), members.length? el("div",{class:"chips"},members.map(p=>personChip(p,roleOf(p,"bereiche",id)))) : el("p",{class:"hint"},"Noch niemand zugeordnet.")) : null ];
+  const saveBtn=el("button",{class:"btn primary",disabled:readOnly(),onclick:async()=>{
+    const n=name.value.trim(); if(!n){toast("Name fehlt");return;}
+    const bid=id||uniqueId(S.bereiche,slug(n));
+    saveBtn.disabled=true;
+    if (await save("bereiche/"+bid,{name:n,phase:+ph.value,gf:gf.value,beschreibung:desc.value,order:+ord.value||99,soll:+soll.value||0})) { toast("Gespeichert"); closeDrawer(); } else saveBtn.disabled=false;
+  }},"Speichern");
+  const foot=[ isNew?null:deleteBlock("Bereich „"+b.name+"“", async()=>{ if(await remove("bereiche/"+id)){toast("Gelöscht");closeDrawer();} }, "Die Zuordnungen der Personen werden mit entfernt."), el("span",{class:"spacer"}), el("button",{class:"btn",onclick:closeDrawer},"Abbrechen"), saveBtn ];
+  drawer(isNew?"Neuer Bereich":b.name, body, foot);
+}
+
+// Abteilung
+function openAbt(id, parent){
+  const a = id ? {...S.abteilungen[id]} : {name:"",parent:parent||"",beschreibung:"",order:99,soll:""};
+  const isNew=!id;
+  const descendants=new Set(); if(id){ const walk=x=>{ for(const c of abtChildren(x)){ descendants.add(c.id); walk(c.id);} }; walk(id); }
+  const name=textInput("a-name",a.name,"z. B. Wartung");
+  const par=selectInput("a-par",[["","– oberste Ebene –"],...abtList().filter(x=>x.id!==id && !descendants.has(x.id)).map(x=>[x.id,abtPath(x)])],a.parent||"");
+  const ord=numInput("a-ord",a.order??99,1,99);
+  const soll=numInput("a-soll",a.soll||"",0,99);
+  const desc=textArea("a-desc",a.beschreibung,"Aufgabe der Abteilung, Abgrenzung zu anderen");
+  const members = id ? membersOf("abteilungen",id) : [];
+  const kids = id ? abtChildren(id) : [];
+  const body=[ field("Abteilung",name), field("Übergeordnete Abteilung",par), el("div",{class:"row2"}, field("Reihenfolge",ord), field("Soll-Besetzung",soll,"Personen direkt in dieser Abteilung")), field("Beschreibung",desc),
+    id? el("fieldset",{}, el("legend",{},"Mitglieder (Rolle per Drag & Drop oder bei der Person ändern)"), members.length? el("div",{class:"chips"},members.map(p=>personChip(p,roleOf(p,"abteilungen",id)))) : el("p",{class:"hint"},"Noch niemand zugeordnet.")) : null,
+    id&&kids.length? el("p",{class:"hint"},"Unterabteilungen: "+kids.map(k=>k.name).join(", ")) : null ];
+  const saveBtn=el("button",{class:"btn primary",disabled:readOnly(),onclick:async()=>{
+    const n=name.value.trim(); if(!n){toast("Name fehlt");return;}
+    const aid=id||uniqueId(S.abteilungen,slug(n));
+    saveBtn.disabled=true;
+    if (await save("abteilungen/"+aid,{name:n,parent:par.value,beschreibung:desc.value,order:+ord.value||99,soll:+soll.value||0})) { toast("Gespeichert"); closeDrawer(); } else saveBtn.disabled=false;
+  }},"Speichern");
+  const foot=[ isNew?null:deleteBlock("Abteilung „"+a.name+"“", async()=>{
+      saveBtn.disabled=true;
+      for (const k of kids) await save("abteilungen/"+k.id,{...k,parent:a.parent||""});   // children move up one level
+      if(await remove("abteilungen/"+id)){toast("Gelöscht");closeDrawer();}
+    }, kids.length?"Unterabteilungen rücken eine Ebene nach oben.":""), el("span",{class:"spacer"}), el("button",{class:"btn",onclick:closeDrawer},"Abbrechen"), saveBtn ];
+  drawer(isNew?(parent?"Neue Unterabteilung":"Neue Abteilung"):a.name, body, foot);
+}
+
+// Stufe (doc id = laufbahn__stufe)
+function openStufe(docId){
+  const s = docId ? {...S.stufen[docId]} : {laufbahn:S.lbSel||(cfg().laufbahnen[0]||{}).id||"",id:"",name:"",order:(stufenOf(S.lbSel).length+1),status:"entwurf"};
+  const isNew=!docId;
+  const name=textInput("s-name",s.name,"z. B. Geselle, Senior Projektleiter");
+  const lb=selectInput("s-lb",cfg().laufbahnen.map(l=>[l.id,l.name]),s.laufbahn);
+  const ord=numInput("s-ord",s.order??1,1,20);
+  const status=selectInput("s-status",[["entwurf","Entwurf"],["abgestimmt","Abgestimmt"]],s.status||"entwurf");
+  const inputs={};
+  const body=[ field("Bezeichnung",name), el("div",{class:"row2"}, field("Laufbahn",lb), field("Stufe Nr.",ord)), field("Status",status,"„Abgestimmt“ nach dem Workshop setzen") ];
+  for (const [k,l,h] of PROFILE_FIELDS){ inputs[k]= k==="gehalt"? textInput("s-"+k,s[k],"z. B. 3. Ebene / Stufe B") : textArea("s-"+k,s[k],h); body.push(field(l,inputs[k],k==="gehalt"?h:null)); }
+  const who=docId? peopleList().filter(p=>p.laufbahn===s.laufbahn&&p.stufe===s.id) : [];
+  if (docId) body.push(el("fieldset",{},el("legend",{},"Auf dieser Stufe"), who.length? el("div",{class:"chips"},who.map(p=>personChip(p,""))) : el("p",{class:"hint"},"Niemand eingestuft.")));
+  const saveBtn=el("button",{class:"btn primary",disabled:readOnly(),onclick:async()=>{
+    const n=name.value.trim(); if(!n){toast("Bezeichnung fehlt");return;}
+    const sid = isNew ? slug(n) : s.id; const newDoc = lb.value+"__"+sid;
+    if (isNew && S.stufen[newDoc]) { toast("Diese Stufe gibt es in der Laufbahn schon"); return; }
+    const doc={laufbahn:lb.value,id:sid,name:n,order:+ord.value||1,status:status.value};
+    for (const [k] of PROFILE_FIELDS) doc[k]=inputs[k].value;
+    saveBtn.disabled=true;
+    const ok = await save("stufen/"+newDoc, doc);
+    if (ok && !isNew && newDoc!==docId) await remove("stufen/"+docId);
+    if (ok){ S.lbSel=lb.value; toast("Gespeichert"); closeDrawer(); } else saveBtn.disabled=false;
+  }},"Speichern");
+  const foot=[ isNew?null:deleteBlock("Stufe „"+s.name+"“", async()=>{ if(await remove("stufen/"+docId)){toast("Gelöscht");closeDrawer();} }), el("span",{class:"spacer"}), el("button",{class:"btn",onclick:closeDrawer},"Abbrechen"), saveBtn ];
+  drawer(isNew?"Neue Stufe":s.name, body, foot);
+}
+
+// Grundeinstellungen
+function openConfig(){
+  const gfItems=cfg().gfs.map(g=>({v:g})); const lbs=cfg().laufbahnen.map(l=>({...l})); const krs=cfg().kriterien.map(k=>({...k})); const phs=phases().map(p=>({n:p.n,name:p.name}));
+  const listEditor=(items, getLabel, setLabel, add, title, help)=>{
+    const box=el("fieldset",{},el("legend",{},title));
+    const list=el("div",{});
+    const paint=()=>{ list.replaceChildren(...items.map((it,i)=>{ const inp=el("input",{type:"text",value:getLabel(it),oninput:e=>setLabel(it,e.target.value)}); return el("div",{style:"display:flex;gap:6px;margin:4px 0;align-items:center"}, inp, el("button",{class:"btn sm",type:"button",title:"nach oben",onclick:()=>{ if(i>0){[items[i-1],items[i]]=[items[i],items[i-1]];paint();}}},"↑"), el("button",{class:"btn sm danger",type:"button",onclick:()=>{items.splice(i,1);paint();}},"×")); })); };
+    paint();
+    box.append(list, el("button",{class:"btn sm",type:"button",style:"margin-top:6px",onclick:()=>{items.push(add());paint();}},"+ hinzufügen"), help?el("p",{class:"help",style:"margin:6px 0 0"},help):null);
+    return box;
+  };
+  const phBox=listEditor(phs, p=>p.name, (p,v)=>{p.name=v;}, ()=>({n:Math.max(0,...phs.map(x=>x.n))+1,name:""}), "Phasen der Wertschöpfung", "Reihenfolge = Spalten im Organigramm. Eine gelöschte Phase lässt ihre Bereiche in der Spalte „Ohne Phase“ stehen, bis sie neu zugeordnet sind.");
+  const gfBox=listEditor(gfItems, g=>g.v, (g,v)=>{g.v=v;}, ()=>({v:""}), "Geschäftsführung", "Namen, wie sie in der App erscheinen.");
+  const lbBox=listEditor(lbs, l=>l.name, (l,v)=>{l.name=v; if(!l.id) l.id=slug(v);}, ()=>({id:"",name:""}), "Laufbahnen", "Jede Laufbahn hat eigene Stufen, z. B. Gewerblich: Lehrling → Geselle → Meister → Bauleiter; Projektleitung: Junior → Senior → Koordinator → Leiter.");
+  const krBox=listEditor(krs, k=>k.name, (k,v)=>{k.name=v; if(!k.id) k.id=slug(v);}, ()=>({id:"",name:""}), "Bewertungskriterien", "Werden bei jeder Person mit 1–5 bewertet.");
+  const saveBtn=el("button",{class:"btn primary",disabled:readOnly(),onclick:async()=>{
+    const doc={phasen:phs.filter(p=>p.name.trim()).map(p=>({n:p.n,name:p.name.trim()})), gfs:gfItems.map(g=>g.v.trim()).filter(Boolean), laufbahnen:lbs.filter(l=>l.name.trim()).map(l=>({id:l.id||slug(l.name),name:l.name.trim()})), kriterien:krs.filter(k=>k.name.trim()).map(k=>({id:k.id||slug(k.name),name:k.name.trim()}))};
+    saveBtn.disabled=true;
+    if (await save("config/main",doc)) { toast("Gespeichert"); closeDrawer(); } else saveBtn.disabled=false;
+  }},"Speichern");
+  drawer("Grundeinstellungen", [phBox, gfBox, lbBox, krBox], [el("span",{class:"spacer"}), el("button",{class:"btn",onclick:closeDrawer},"Abbrechen"), saveBtn]);
+}
+
+// ---------- SharePoint-Datenschicht (Microsoft Graph) ----------
+const CFG = window.HALLER_CONFIG || {};
+const GRAPH = "https://graph.microsoft.com/v1.0";
+const SCOPES = ["Sites.Manage.All","User.Read"];
+const READABLE = { // zusätzliche Spalten für SharePoint-Ansichten / Power Automate; die vollständigen Daten liegen in "Daten" (JSON)
+  people:[["Laufbahn","text"],["Stufe","text"],["GF","text"],["Extern","boolean"],["Geprueft","boolean"],["Schluesselfigur","boolean"],["Fuehrungskraft","boolean"],["Eintritt","text"],["Sprache","text"]],
+  bereiche:[["Phase","number"],["Reihenfolge","number"],["GF","text"],["Soll","number"]],
+  abteilungen:[["Uebergeordnet","text"],["Reihenfolge","number"],["Soll","number"]],
+  stufen:[["Laufbahn","text"],["StufeId","text"],["Reihenfolge","number"],["Status","text"],["Gehalt","text"]],
+  config:[],
+};
+const readableValues = (coll,id,d)=>({
+  people:{Laufbahn:d.laufbahn||"",Stufe:d.stufe||"",GF:d.gf||"",Extern:!!d.extern,Geprueft:!!d.stufeGeprueft,Schluesselfigur:!!d.schluessel,Fuehrungskraft:!!d.fuehrung,Eintritt:d.eintritt||"",Sprache:d.sprache||""},
+  bereiche:{Phase:+d.phase||0,Reihenfolge:+d.order||0,GF:d.gf||"",Soll:+d.soll||0},
+  abteilungen:{Uebergeordnet:d.parent||"",Reihenfolge:+d.order||0,Soll:+d.soll||0},
+  stufen:{Laufbahn:d.laufbahn||"",StufeId:d.id||"",Reihenfolge:+d.order||0,Status:d.status||"",Gehalt:d.gehalt||""},
+  config:{},
+}[coll]);
+const SP = {
+  msal:null, account:null, siteId:null, listIds:{}, items:{}, timer:null,
+  async init(){
+    if (!CFG.clientId || CFG.clientId.startsWith("HIER-")) { $("#loginErr").textContent="config.js: Client-ID fehlt."; $("#loginBox").hidden=false; return false; }
+    this.msal = new msal.PublicClientApplication({ auth:{ clientId:CFG.clientId, authority:"https://login.microsoftonline.com/"+(CFG.tenantId||"organizations"), redirectUri:location.origin+location.pathname }, cache:{ cacheLocation:"localStorage" } });
+    await this.msal.initialize();
+    const res = await this.msal.handleRedirectPromise().catch(e=>{ $("#loginErr").textContent=e.message; return null; });
+    this.account = (res&&res.account) || this.msal.getAllAccounts()[0] || null;
+    return !!this.account;
+  },
+  login(){ this.msal.loginRedirect({scopes:SCOPES}); },
+  logout(){ this.msal.logoutRedirect({account:this.account}); },
+  async token(){
+    try { return (await this.msal.acquireTokenSilent({scopes:SCOPES, account:this.account})).accessToken; }
+    catch(e){ await this.msal.acquireTokenRedirect({scopes:SCOPES, account:this.account}); }
+  },
+  async call(method, url, body){
+    const t=await this.token();
+    const r=await fetch(url.startsWith("http")?url:GRAPH+url, {method, headers:{Authorization:"Bearer "+t, "Content-Type":"application/json"}, body: body?JSON.stringify(body):undefined});
+    if (r.status===204) return null;
+    const j=await r.json().catch(()=>({}));
+    if (!r.ok){ const err=new Error((j.error&&j.error.message)||r.statusText); err.status=r.status; throw err; }
+    return j;
+  },
+  async connect(){
+    const site=await this.call("GET", `/sites/${CFG.siteHost}:${CFG.sitePath}`); this.siteId=site.id;
+    const lists=await this.call("GET", `/sites/${this.siteId}/lists?$select=id,displayName&$top=999`);
+    this.listIds={};
+    for (const [coll,name] of Object.entries(CFG.lists)){ const l=lists.value.find(x=>x.displayName===name); if(l) this.listIds[coll]=l.id; }
+    return Object.keys(CFG.lists).every(c=>this.listIds[c]);
+  },
+  async createLists(log){
+    for (const [coll,name] of Object.entries(CFG.lists)){
+      if (this.listIds[coll]) { log(`Liste „${name}“ vorhanden.`); continue; }
+      const columns=[{name:"Kennung",text:{},indexed:true},{name:"Daten",text:{allowMultipleLines:true,textType:"plain",maxLength:60000}}];
+      for (const [n,t] of READABLE[coll]) columns.push(t==="text"?{name:n,text:{}}:t==="number"?{name:n,number:{}}:{name:n,boolean:{}});
+      const l=await this.call("POST", `/sites/${this.siteId}/lists`, {displayName:name, columns, list:{template:"genericList"}});
+      this.listIds[coll]=l.id; log(`Liste „${name}“ angelegt.`);
+    }
+  },
+  async loadAll(){
+    const out={};
+    for (const coll of Object.keys(CFG.lists)){
+      const docs={}; this.items[coll]={};
+      let url=`/sites/${this.siteId}/lists/${this.listIds[coll]}/items?$expand=fields($select=Title,Kennung,Daten)&$top=500`;
+      while(url){
+        const page=await this.call("GET", url);
+        for (const it of page.value){ const f=it.fields||{}; if(!f.Kennung) continue; let d={}; try{ d=JSON.parse(f.Daten||"{}"); }catch(_){ } this.items[coll][f.Kennung]=it.id; docs[f.Kennung]= coll==="stufen" ? {...d} : {...d, id:f.Kennung}; }
+        url=page["@odata.nextLink"]||null;
+      }
+      out[coll]=docs;
+    }
+    return out;
+  },
+  async set(coll,id,data){
+    const fields={Title:(data.name||id).toString().slice(0,250), Kennung:id, Daten:JSON.stringify(data), ...readableValues(coll,id,data)};
+    const itemId=this.items[coll]&&this.items[coll][id];
+    if (itemId) await this.call("PATCH", `/sites/${this.siteId}/lists/${this.listIds[coll]}/items/${itemId}/fields`, fields);
+    else { const it=await this.call("POST", `/sites/${this.siteId}/lists/${this.listIds[coll]}/items`, {fields}); (this.items[coll]=this.items[coll]||{})[id]=it.id; }
+    S[coll]={...S[coll], [id]: coll==="stufen"?{...data}:{...data,id}};
+    if (coll==="config") S.config={...DEFAULT_CONFIG,...data};
+    this.scheduleRefresh(2000);
+  },
+  async remove(coll,id){
+    const itemId=this.items[coll]&&this.items[coll][id]; if(!itemId) return;
+    await this.call("DELETE", `/sites/${this.siteId}/lists/${this.listIds[coll]}/items/${itemId}`);
+    delete this.items[coll][id]; const o={...S[coll]}; delete o[id]; S[coll]=o; this.scheduleRefresh(2000);
+  },
+  async refresh(){
+    try{
+      const data=await this.loadAll();
+      S.people=data.people; S.bereiche=data.bereiche; S.abteilungen=data.abteilungen; S.stufen=data.stufen;
+      S.config = data.config.main ? {...DEFAULT_CONFIG, ...data.config.main} : null;
+      for (const k of Object.keys(S.loaded)) S.loaded[k]=true;
+      S.lastSync=new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}); setStatus();
+      if(!$("#drawerRoot").children.length) render();
+    }catch(e){ console.error(e); if(e.status===403){ S.canWrite=false; } toast("Aktualisierung fehlgeschlagen: "+e.message); }
+  },
+  scheduleRefresh(ms){ clearTimeout(this.timer); this.timer=setTimeout(()=>{ this.refresh().then(()=>this.scheduleRefresh((CFG.refreshSeconds||20)*1000)); }, ms); },
+  async importSeed(log){
+    const seed=window.HALLER_SEED||{};
+    for (const coll of ["config","bereiche","abteilungen","stufen","people"]){
+      const docs=seed[coll]||{}; let n=0;
+      for (const [id,d] of Object.entries(docs)){ if(this.items[coll]&&this.items[coll][id]) continue; await this.set(coll,id,d); n++; }
+      log(`${n} Einträge in „${CFG.lists[coll]}“ importiert.`);
+    }
+  },
+};
+
+// ---------- Boot ----------
+render(); setStatus();
+$("#loginBtn").addEventListener("click", ()=>SP.login());
+$("#logoutBtn").addEventListener("click", ()=>SP.logout());
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.db) SP.scheduleRefresh(500); });
+(async()=>{
+  const ok = await SP.init();
+  if (!ok){ $("#loginBox").hidden=false; return; }
+  S.user = SP.account.name || SP.account.username; $("#logoutBtn").hidden=false; setStatus();
+  let ready=false;
+  try { ready = await SP.connect(); }
+  catch(e){ console.error(e); $("#loginErr").textContent="Zugriff auf die SharePoint-Site fehlgeschlagen: "+e.message; $("#loginBox").hidden=false; return; }
+  if (!ready){
+    $("#setupBox").hidden=false;
+    $("#setupBtn").addEventListener("click", async ()=>{
+      const logEl=$("#setupLog"); logEl.hidden=false; const log=m=>{ logEl.textContent+=m+"\n"; };
+      $("#setupBtn").disabled=true;
+      try{ await SP.createLists(log); await SP.loadAll(); await SP.importSeed(log); log("Fertig – die App wird geladen."); $("#setupBox").hidden=true; S.db=SP; await SP.refresh(); SP.scheduleRefresh((CFG.refreshSeconds||20)*1000); }
+      catch(e){ log("Fehler: "+e.message+" (Berechtigung Sites.Manage.All erteilt?)"); $("#setupBtn").disabled=false; }
+    });
+    return;
+  }
+  S.db=SP; S.canWrite=null;
+  await SP.refresh();
+  if (!Object.keys(S.people).length && !Object.keys(S.bereiche).length && window.HALLER_SEED){
+    $("#setupBox").hidden=false; $("#setupBox h2").textContent="Startdaten importieren"; $("#setupBtn").textContent="Startdaten importieren";
+    $("#setupBtn").addEventListener("click", async ()=>{ const logEl=$("#setupLog"); logEl.hidden=false; const log=m=>{logEl.textContent+=m+"\n";}; $("#setupBtn").disabled=true; try{ await SP.importSeed(log); $("#setupBox").hidden=true; await SP.refresh(); }catch(e){ log("Fehler: "+e.message); $("#setupBtn").disabled=false; } });
+  }
+  SP.scheduleRefresh((CFG.refreshSeconds||20)*1000);
+})();
+})();
+</script>
+</body>
+</html>
