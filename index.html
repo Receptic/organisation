@@ -242,12 +242,12 @@ img{max-width:100%}[hidden]{display:none!important}
       <button class="tab" role="tab" data-view="roles" aria-selected="false">Rollen &amp; Stufen</button>
       <button class="tab" role="tab" data-view="eval" aria-selected="false">Auswertung</button>
     </nav>
-    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde …</span><button class="btn sm" id="logoutBtn" hidden>Abmelden</button></div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde …</span><button class="btn sm primary" id="loginBtnTop">Anmelden</button><button class="btn sm" id="logoutBtn" hidden>Abmelden</button></div>
   </div>
 </header>
 
 <main class="page">
-  <div class="login" id="loginBox" hidden><h2>Anmeldung</h2><p>Bitte mit dem Microsoft-365-Konto von Elektro A. Haller anmelden.</p><button class="btn primary" id="loginBtn">Mit Microsoft anmelden</button><p class="hint" id="loginErr"></p></div>
+  <div class="login" id="loginBox"><h2>Anmeldung</h2><p>Bitte mit dem Microsoft-365-Konto von Elektro A. Haller anmelden.</p><button class="btn primary" id="loginBtn">Mit Microsoft anmelden</button><p class="hint" id="loginErr"></p></div>
   <div class="setup" id="setupBox" hidden><h2>Einrichtung</h2><p class="hint">Die SharePoint-Listen für die Organisations-App fehlen noch auf der Site. Mit einem Klick werden sie angelegt und mit den Startdaten (Stand 16.10.2026) gefüllt.</p><button class="btn primary" id="setupBtn">Listen anlegen und Startdaten importieren</button><div class="log" id="setupLog" hidden></div></div>
   <section class="view" id="view-org">
     <div class="toolbar">
@@ -482,7 +482,8 @@ function unitCard(kind, u, opts={}){
 
 // ---------- Render ----------
 function render(){
-  for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== "view-"+S.view;
+  const loggedOut = !$("#loginBox").hidden;
+  for (const v of document.querySelectorAll(".view")) v.hidden = loggedOut || v.id !== "view-"+S.view;
   const empty = Object.keys(S.people).length===0 && Object.keys(S.bereiche).length===0 && S.loaded.people && S.loaded.bereiche;
   $("#emptyState").hidden = !empty;
   if (S.view==="org") renderOrg();
@@ -1056,7 +1057,15 @@ const SP = {
 
 // ---------- Boot ----------
 render(); setStatus();
-$("#loginBtn").addEventListener("click", ()=>SP.login());
+async function loginNow(){
+  try{
+    if (!window.msal) throw new Error("Die Microsoft-Anmeldebibliothek wurde nicht geladen. Werbeblocker für diese Seite ausschalten und mit Strg+F5 neu laden.");
+    if (!SP.msal){ const ok=await SP.init(); if(ok){ location.reload(); return; } }
+    SP.login();
+  }catch(e){ $("#loginErr").textContent="Anmeldung nicht möglich: "+(e.message||e); }
+}
+$("#loginBtn").addEventListener("click", loginNow);
+$("#loginBtnTop").addEventListener("click", loginNow);
 $("#logoutBtn").addEventListener("click", ()=>SP.logout());
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.db) SP.scheduleRefresh(500); });
 (async()=>{
@@ -1066,7 +1075,7 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.db)
     ok = await SP.init();
   } catch(e){ console.error(e); $("#loginErr").textContent="Fehler beim Start: "+(e.message||e); $("#loginBox").hidden=false; return; }
   if (!ok){ $("#loginBox").hidden=false; return; }
-  S.user = SP.account.name || SP.account.username; $("#logoutBtn").hidden=false; setStatus();
+  S.user = SP.account.name || SP.account.username; $("#logoutBtn").hidden=false; $("#loginBtnTop").hidden=true; $("#loginBox").hidden=true; setStatus();
   let ready=false;
   try { ready = await SP.connect(); }
   catch(e){ console.error(e); $("#loginErr").textContent="Zugriff auf die SharePoint-Site fehlgeschlagen: "+e.message; $("#loginBox").hidden=false; return; }
