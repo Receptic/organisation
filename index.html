@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Haller Organisation</title>
-<script src="https://alcdn.msauth.net/browser/3.10.0/js/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
+<script>if(!window.msal){document.write('<script src="https://alcdn.msauth.net/browser/3.10.0/js/msal-browser.min.js"><\/script>');}</script>
 <script src="config.js"></script>
 <script src="seed.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap">
@@ -1059,7 +1060,11 @@ $("#loginBtn").addEventListener("click", ()=>SP.login());
 $("#logoutBtn").addEventListener("click", ()=>SP.logout());
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && S.db) SP.scheduleRefresh(500); });
 (async()=>{
-  const ok = await SP.init();
+  let ok=false;
+  try {
+    if (!window.msal) throw new Error("Die Microsoft-Anmeldebibliothek konnte nicht geladen werden. Bitte Werbeblocker für diese Seite ausschalten (cdn.jsdelivr.net und alcdn.msauth.net erlauben) und neu laden.");
+    ok = await SP.init();
+  } catch(e){ console.error(e); $("#loginErr").textContent="Fehler beim Start: "+(e.message||e); $("#loginBox").hidden=false; return; }
   if (!ok){ $("#loginBox").hidden=false; return; }
   S.user = SP.account.name || SP.account.username; $("#logoutBtn").hidden=false; setStatus();
   let ready=false;
